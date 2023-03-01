@@ -13,7 +13,8 @@ int main() {
         if(input == 0) break;
         liczby[i] = input;
     }
-    drukuj(liczby, MAX_SIZE);
+    // drukuj(liczby, MAX_SIZE);
+    drukuj_alt(liczby, MAX_SIZE);
     return 0;
 }
 
@@ -30,5 +31,13 @@ void drukuj(int tablica[], int liczba_elementow) {
 }
 
 void drukuj_alt(int * tablica, int liczba_elementow) {
-    
+    printf("From drukuj_alt\n");
+    printf("%4s%12s\n", "i", "*tablica");
+    int i;
+    for(i = 0; i < liczba_elementow; i++) {
+        if(*tablica > 10 && *tablica < 100) {
+            printf("%4d%12d\n", i, *tablica);
+            tablica++;
+        }
+    }
 }
