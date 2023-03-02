@@ -37,7 +37,7 @@ void drukuj_alt(int * tablica, int liczba_elementow) {
     for(i = 0; i < liczba_elementow; i++) {
         if(*tablica > 10 && *tablica < 100) {
             printf("%4d%12d\n", i, *tablica);
-            tablica++;
         }
+        tablica++;
     }
 }
