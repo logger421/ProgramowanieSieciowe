@@ -8,6 +8,7 @@
 *.elf
 
 programs_c/lab1/build
+programs_c/lab1/*.o
 .vscode/
 
 # Linker output
