@@ -7,7 +7,7 @@
 #define BUFFER_SIZE 50
 
 void close_fd(int fd);
-void copy_source(int src, int dest, char *buff, int buff_size);
+void copy_source(int src, int dest, char *buff, size_t buff_size);
 
 int main(int argc, char *argv[]) {
     // assure that user passed 2 arguments
@@ -51,9 +51,15 @@ void close_fd(int fd) {
     }
 }
 
-void copy_source(int src, int dest, char *buff, int buff_size) {
+void copy_source(int src, int dest, char *buff, size_t buff_size) {
     ssize_t bytes_read;
+    size_t bytes_to_write;
     while ((bytes_read = read(src, buff, buff_size)) > 0) {
-        write(dest, buff, bytes_read);
+        if(bytes_read == -1) {
+            perror("read() function error");
+            exit(EXIT_FAILURE);
+        }
+        bytes_to_write = (size_t) bytes_read;
+        write(dest, buff, bytes_to_write);
     }
 }

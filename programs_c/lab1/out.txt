@@ -1,11 +1,5 @@
-1. Lorem ipsum dolor sit amet.
-2. Lorem ipsum dolor sit amet.
-3. Lorem ipsum dolor sit amet.
-4. Lorem ipsum dolor sit amet.
-5. Lorem ipsum dolor sit amet.
-6. Lorem ipsum dolor sit amet.
-7. Lorem ipsum dolor sit amet.
-8. Lorem ipsum dolor sit amet.
-9. Lorem ipsum dolor sit amet.
-10. Lorem ipsum dolor sit amet.
-12.
+1. Lorem ipsum dolor sit
+3. Lorem ipsum dolor sit
+5. Lorem ipsum dolor sit
+7. Lorem ipsum dolor sit
+9. Lorem ipsum dolor sit ame.
