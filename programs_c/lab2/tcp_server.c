@@ -13,11 +13,18 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    // assure that user passed 2 arguments
+    if (argc < 2) {
+        printf("Usage: %s <portNumber>\n", argv[0]);
+        return 1;
+    }
+
     int lst_sock;   // gniazdko nasłuchujące
     int clnt_sock;  // gniazdko połączone z bieżącym klientem
     int rc;         // "rc" to skrót słów "result code"
+    u_int16_t port = atoi(argv[1]);
     ssize_t cnt;    // wyniki zwracane przez read() i write() są tego typu
 
     lst_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -29,7 +36,7 @@ int main(void)
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
         .sin_addr = { .s_addr = htonl(INADDR_ANY) },
-        .sin_port = htons(20123)
+        .sin_port = htons(port)
     };
 
     rc = bind(lst_sock, (struct sockaddr *) & addr, sizeof(addr));
@@ -48,23 +55,23 @@ int main(void)
     while (keep_on_handling_clients) {
 
         clnt_sock = accept(lst_sock, NULL, NULL);
-        if (rc == -1) {
+        if (clnt_sock == -1) {
             perror("accept");
             return 1;
         }
 
-        unsigned char buf[16];
+        unsigned char buf[24];
 
-        cnt = read(clnt_sock, buf, 16);
+        cnt = read(clnt_sock, buf, 24);
         if (cnt == -1) {
             perror("read");
             return 1;
         }
         printf("read %zi bytes\n", cnt);
 
-        memcpy(buf, "pong", 4);
+        memcpy(buf, "Hello, world!\r\n", 16);
 
-        cnt = write(clnt_sock, buf, 4);
+        cnt = write(clnt_sock, buf, 16);
         if (cnt == -1) {
             perror("write");
             return 1;
