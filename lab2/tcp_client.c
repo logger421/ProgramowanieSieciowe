@@ -15,7 +15,7 @@
 int main(int argc, char *argv[])
 {
     if (argc < 3) {
-        printf("Usage: %s <portNumber> <>\n", argv[0]);
+        printf("Usage: %s <portNumber> <serverAddres>\n", argv[0]);
         return 1;
     }
 
@@ -49,13 +49,12 @@ int main(int argc, char *argv[])
     printf("read %zi bytes\n", cnt);
     int i;
     for(i = 0; i <= cnt; i++) {
-        if(((int)buf[i]>=32 && (int)buf[i]<=126) || ()) 
+        if(((int)buf[i]>=32 && (int)buf[i]<=126)) 
             printf("%c", buf[i]);
         else
             printf("?");
     }
-    printf("%s\n", buf);
-    
+    puts("\n");
     rc = close(sock);
     if (rc == -1) {
         perror("close");
