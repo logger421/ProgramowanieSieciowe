@@ -51,39 +51,27 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    unsigned char buf[15];
+    memcpy(buf, "Hello, world!\r\n", 15);
+
     bool keep_on_handling_clients = true;
     while (keep_on_handling_clients) {
-
         clnt_sock = accept(lst_sock, NULL, NULL);
         if (clnt_sock == -1) {
             perror("accept");
             return 1;
         }
-
-        unsigned char buf[24];
-
-        cnt = read(clnt_sock, buf, 24);
-        if (cnt == -1) {
-            perror("read");
-            return 1;
-        }
-        printf("read %zi bytes\n", cnt);
-
-        memcpy(buf, "Hello, world!\r\n", 16);
-
-        cnt = write(clnt_sock, buf, 16);
+        cnt = write(clnt_sock, buf, 15);
         if (cnt == -1) {
             perror("write");
             return 1;
         }
         printf("wrote %zi bytes\n", cnt);
-
         rc = close(clnt_sock);
         if (rc == -1) {
             perror("close");
             return 1;
         }
-
     }
 
     rc = close(lst_sock);

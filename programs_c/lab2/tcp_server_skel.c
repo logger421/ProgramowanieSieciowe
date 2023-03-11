@@ -48,7 +48,6 @@ int main(void)
     while (keep_on_handling_clients) {
 
         clnt_sock = accept(lst_sock, NULL, NULL);
-        // błąd sprawdzane było rc a nie clnt_sock
         if (clnt_sock == -1) {
             perror("accept");
             return 1;
