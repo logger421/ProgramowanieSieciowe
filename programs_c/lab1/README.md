@@ -1,41 +1,33 @@
 Zadania:
+```
+1. Napisz program w C deklarujący w funkcji main tablicę int liczby[50] i wczytujący do niej z klawiatury kolejne liczby. Wczytywanie należy przerwać gdy użytkownik wpisze zero albo gdy skończy się miejsce w tablicy (tzn. po wczytaniu 50 liczb).
 
-Linuksowe dystrybucje zazwyczaj zawierają program netcat (może być też dostępny pod nazwą nc) lub jego ulepszoną wersję, ncat. Pozwala on m.in. nawiązać połączenie ze wskazanym serwerem, a następnie wysyłać do niego znaki wpisywane z klawiatury; odpowiedzi zwracane przez serwer są drukowane na ekranie. Pozwala też uruchomić się w trybie serwera czekającego na połączenie na wskazanym numerze portu.
+Z main należy następnie wywoływać pomocniczą funkcję drukuj, przekazując jej jako argumenty adres tablicy oraz liczbę wczytanych do niej liczb. Funkcję tę zadeklaruj jako void drukuj(int tablica[], int liczba_elementow). W jej ciele ma być pętla for drukująca te elementy tablicy, które są większe od 10 i mniejsze od 100.
+```
+```
+2. Przypomnij sobie wiadomości o wskaźnikach i arytmetyce wskaźnikowej w C. Napisz alternatywną wersję funkcji drukującej liczby, o sygnaturze void drukuj_alt(int * tablica, int liczba_elementow). Nie używaj w niej indeksowania zmienną całkowitoliczbową (nie może się więc pojawić ani tablica[i], ani *(tablica+i)), zamiast tego użyj wskaźnika przesuwanego z elementu na element przy pomocy ++.
+```
+```
+3. Opracuj funkcję sprawdzającą, czy przekazany jej bufor zawiera tylko i wyłącznie drukowalne znaki ASCII, tzn. bajty o wartościach z przedziału domkniętego [32, 126]. Funkcja ma mieć następującą sygnaturę: bool printable_buf(const void * buf, int len).
 
-Otwórz dwa okna terminalowe, w pierwszym z nich uruchom
+Pamiętaj o włączeniu nagłówka <stdbool.h>, bez niego kompilator nie rozpozna ani nazwy typu bool, ani nazw stałych true i false.
 
-ncat -v -l 20123
-a w drugim
+Trzeba będzie użyć rzutowania wskaźników, bo typ void * oznacza „adres w pamięci, ale bez informacji o tym co w tym fragmencie pamięci się znajduje”. Na początku ciała funkcji trzeba go zrzutować do typu „adres fragmentu pamięci zawierającego ciąg bajtów”.
+```
+```
+4. A teraz opracuj wersję, która jako argument dostaje łańcuch w sensie języka C, czyli ciąg niezerowych bajtów zakończony bajtem równym zero (ten końcowy bajt nie jest uznawany za należący do łańcucha). Ta wersja funkcji powinna mieć taką sygnaturę: bool printable_str(const char * buf).
+```
+```
+5. W dokumentacji POSIX API znajdź opisy czterech podstawowych funkcji plikowego wejścia-wyjścia, tzn. open, read, write i close. Czy zgadzają się one z tym, co pamiętasz z przedmiotu „Systemy operacyjne”? Jakie znaczenie ma wartość 0 zwrócona jako wynik funkcji read?
+```
+```
+6. Zaimplementuj program kopiujący dane z pliku do pliku przy pomocy powyższych funkcji. Zakładamy, że nazwy plików są podawane przez użytkownika jako argumenty programu (tzn. będą dostępne w tablicy argv). Zwróć szczególną uwagę na obsługę błędów — każde wywołanie funkcji we-wy musi być opatrzone testem sprawdzającym, czy zakończyło się ono sukcesem, czy porażką.
 
-ncat -v 127.0.0.1 20123
-(adres 127.0.0.1 to taki magiczny adres IPv4, który zawsze oznacza lokalny komputer). Jeśli wszystko poszło dobrze i netcaty nawiązały połączenie, to linie wpisywane w jednym z okien powinny pojawiać się w drugim. Aby przerwać działanie netcata użyj kombinacji klawiszy Ctrl-C.
-
-Sprawdź co się dzieje, jeśli spróbujesz uruchomić klienta (netcat bez opcji -l) jako pierwszego. Sprawdź, w jaki sposób netcat-klient oraz netcat-serwer reagują, gdy proces na drugim końcu połączenia zostanie zabity przez Ctrl-C. Proszę nie uogólniać tych obserwacji na wszystkie programy korzystające z gniazdek, inne programy mogą się zachowywać trochę inaczej niż netcat.
-
-Uwaga: jeśli pracujesz zdalnie na spk-ssh, to uruchomiony przez Ciebie netcat może wejść w kolizję z netcatami uruchomionymi w tym samym czasie przez innych studentów. Wybierz wtedy numer portu inny niż 20123, ale większy niż 1024.
-
-Wszystkie wersje netcata domyślnie korzystają z TCP. Trzeba im podać w linii komend opcję -u, aby zamiast gniazdka TCP utworzone zostało gniazdko UDP. Powtórz eksperymenty używając poleceń
-
-ncat -v -u -l 20123
-
-ncat -v -u 127.0.0.1 20123
-Sprawdź co się teraz będzie działo, gdy jeden z działających netcatów zabijesz przez Ctrl-C. Co się zmieniło w porównaniu do eksperymentów z TCP? I czy treść wyświetlanych komunikatów o błędach jest taka sama?
-
-Przejrzyj dokumentację netcata, upewnij się co do znaczenia opcji -v, -l oraz -u. Sprawdź też co robi opcja -C, czyli --crlf. W jakich sytuacjach może ona być potrzebna?
-
-(nieobowiązkowe) Jeśli oprócz polecenia ncat dostępna jest również któraś z odmian polecenia nc albo polecenie socat, to sprawdź czy za jego pomocą też da się wykonać powyższe eksperymenty. Może to wymagać zmiany lub dodania opcji w poleceniach uruchamiających serwer i klienta.
-
-Napisz prosty serwer zwracający wizytówkę. Powinien tworzyć gniazdko TCP nasłuchujące na porcie o numerze podanym jako argv[1] (użyj socket, bind i listen), następnie w pętli czekać na przychodzące połączenia (accept), wysyłać ciąg bajtów Hello, world!\r\n jako swoją wizytówkę, zamykać odebrane połączenie i wracać na początek pętli. Pętla ma działać w nieskończoność, aby przerwać działanie programu trzeba będzie użyć Ctrl-C.
-
-Zamiast pisać kod programu od zera możesz wykorzystać szkielet tcp_srv_skel.c, odpowiednio go rozbudowując (albo przycinając, jeśli są w nim rzeczy niepotrzebne w tym zadaniu).
-Przetestuj netcatem powyższy serwer.
-
-Napisz prostego klienta, który łączy się (użyj socket i connect) z usługą wskazaną argumentami podanymi w linii komend (adres IPv4 w argv[1], numer portu TCP w argv[2]), drukuje na ekranie wizytówkę zwróconą przez serwer i kończy pracę. Pamiętaj o zasadzie ograniczonego zaufania i przed przesłaniem odebranego bajtu na stdout weryfikuj, czy jest to znak drukowalny lub znak kontrolny używany do zakończenia linii bądź wstawienia odstępu ('\n', '\r' oraz '\t').
-
-Możesz użyć tcp_clnt_skel.c jako punktu startowego.
-
-Sprawdź, czy program-klient poprawnie współdziała z programem-serwerem.
-
-Spróbuj napisać podobną parę klient-serwer komunikującą się za pomocą protokołu UDP. Pamiętaj, że UDP nie jest protokołem połączeniowym: wywołanie connect na gniazdku UDP nie powoduje wysłania w sieć żadnych pakietów. Klient musi jako pierwszy wysłać jakiś datagram, a serwer dowiaduje się o istnieniu klienta dopiero gdy ten datagram do niego dotrze. Sprawdź, czy możliwe jest wysyłanie pustych datagramów (tzn. o długości zero bajtów) — jeśli tak, to może niech klient właśnie taki wysyła?
-
-(nieobowiązkowe) Przepisz powyższe rozwiązania w innym języku, np. w Javie lub Pythonie. Porównaj obie wersje i oceń, czy nowy kod jest krótszy i / lub czytelniejszy od starego.
+Funkcje POSIX zwracają -1 aby zasygnalizować wystąpienie błędu, i dodatkowo zapisują w globalnej zmiennej errno kod wskazujący przyczynę wystąpienia błędu (na dysku nie ma pliku o takiej nazwie, brak wystarczających praw dostępu, itd.). Polecam Państwa uwadze pomocniczą funkcję perror, która potrafi przetłumaczyć ten kod na zrozumiały dla człowieka komunikat i wypisać go na ekranie.
+```
+```
+7. (nieobowiązkowe) Modyfikacja powyższego zadania. Zakładamy, że kopiowany plik jest plikiem tekstowym. Linie są zakończone bajtami o wartości 10 (znaki LF, w języku C zapisywane jako '\n'). Podczas kopiowania należy pomijać parzyste linie (tzn. w pliku wynikowym mają się znaleźć pierwsza, trzecia, piąta linia, a druga, czwarta, szósta nie).
+```
+```
+8. (nieobowiązkowe) Kolejna modyfikacja: popraw program tak, aby i znaki '\n', i dwubajtowe sekwencje złożone ze znaku '\r' i następującego po nim znaku '\n' były traktowane jako terminatory linii.
+```
