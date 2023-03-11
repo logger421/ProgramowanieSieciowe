@@ -7,8 +7,8 @@
 *.obj
 *.elf
 
-programs_c/lab1/build
-programs_c/lab1/*.o
+lab*/build
+lab*/*.o
 .vscode/
 
 # Linker output
