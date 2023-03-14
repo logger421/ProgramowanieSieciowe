@@ -9,6 +9,7 @@
 
 lab*/build
 lab*/*.o
+lab*/*.x
 .vscode/
 
 # Linker output
