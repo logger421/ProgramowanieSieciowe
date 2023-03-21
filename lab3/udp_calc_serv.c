@@ -10,16 +10,21 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <limits.h>
+#include <ctype.h>
+
+const int MAX_UDP = 65536;
 
 bool validateData(const char * buff, size_t len);
 int32_t processData(const char* buff, size_t len);
 
 int main(int argc, char *argv[])
 {
-    int lst_sock;   // gniazdko nasłuchujące
+    
+    int32_t result;
     u_int16_t port = 2020;
     ssize_t cnt;    // wyniki zwracane przez read() i write() są tego typu
-    const int MAX_UDP = 65536;
+    int lst_sock;   // gniazdko nasłuchujące    
+    char buff[MAX_UDP];
     // Stwórz nasluchujace gniazdo UDP
     if ( (lst_sock = socket(AF_INET,  SOCK_DGRAM, 0)) == -1) {
         perror("socket");
@@ -31,15 +36,15 @@ int main(int argc, char *argv[])
         .sin_addr = { .s_addr = htonl(INADDR_ANY) },
         .sin_port = htons(port)
     };
-    // struktura reprezentująca odebrany adres klienta
-    struct sockaddr_in cliaddr;
-    memset(&cliaddr, 0, sizeof(cliaddr));
-
+    
     if (bind(lst_sock, (struct sockaddr *) & addr, sizeof(addr)) == -1) {
         perror("bind");
         return 1;
     }
-    char buff[MAX_UDP];
+    
+    // struktura reprezentująca odebrany adres klienta
+    struct sockaddr_in cliaddr;
+    memset(&cliaddr, 0, sizeof(cliaddr));
     socklen_t len = sizeof(cliaddr);
 
     bool keep_on_handling_clients = true;
@@ -49,16 +54,28 @@ int main(int argc, char *argv[])
             perror("recvfrom");
             return 1;
         }
-
+        puts(buff);
         printf("Received %ld bytes\n", cnt);
         if(!validateData(buff, cnt)) {
-            memcpy(buff, "ERROR", 5);
-            if(sendto(lst_sock, (char *) buff, 5, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
-            perror("sendto");
-            return 1;
+            memcpy(buff, "ERROR\r\n", 7);
+            if(sendto(lst_sock, (char *) buff, 7, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+                perror("sendto");
+                return 1;
             }
         } else {
-            processData(buff, cnt);
+            result = processData(buff, cnt-1);
+            
+            if((cnt = sprintf(buff, "%d\r\n", result)) == -1) {
+                perror("sprintf");
+                return 1;
+            }
+            for(int i =0; i < cnt; i++) {
+                printf("%c", buff[i]);
+            }
+            if(sendto(lst_sock, (char *) buff, cnt, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+                perror("sendto");
+                return 1;
+            }
         }
     }
 
@@ -66,22 +83,17 @@ int main(int argc, char *argv[])
         perror("close");
         return 1;
     }
-
     return 0;
 }
 
 bool validateData(const char * buff, size_t len) {
-    int32_t digit;
     int i;
+    char allowedCharacters[] = "0123456789+-\r\n";
     if(isspace(buff[0]) || buff[0] == 43 || buff[0] == 45) 
         return false;
-    char allowedCharacters = "0123456789+-\r\n";
-    for(i = 0; i < len-2; i++) {
+    for(i = 0; i < len; i++) {
       if(strchr(allowedCharacters, buff[i]) == NULL)
         return false;
-    }
-    if (!(strstr(buff, "\r\n") != NULL || strstr(buff, "\n") != NULL)) {
-       return false;
     }
     return true;
 }
@@ -107,7 +119,6 @@ int32_t processData(const char* buff, size_t len) {
         }
         if(buff[i] == '\r' || buff[i] == '\n') break;
     }
-    // Add the last processed number to result
     result += prev_action * curr_numb;
     return result;
 }
