@@ -54,7 +54,6 @@ int main(int argc, char *argv[])
             perror("recvfrom");
             return 1;
         }
-        puts(buff);
         printf("Received %ld bytes\n", cnt);
         if(!validateData(buff, cnt)) {
             memcpy(buff, "ERROR\r\n", 7);
@@ -64,13 +63,9 @@ int main(int argc, char *argv[])
             }
         } else {
             result = processData(buff, cnt-1);
-            
             if((cnt = sprintf(buff, "%d\r\n", result)) == -1) {
                 perror("sprintf");
                 return 1;
-            }
-            for(int i =0; i < cnt; i++) {
-                printf("%c", buff[i]);
             }
             if(sendto(lst_sock, (char *) buff, cnt, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
                 perror("sendto");
@@ -87,13 +82,15 @@ int main(int argc, char *argv[])
 }
 
 bool validateData(const char * buff, size_t len) {
-    int i;
     char allowedCharacters[] = "0123456789+-\r\n";
     if(isspace(buff[0]) || buff[0] == 43 || buff[0] == 45) 
         return false;
+    int i;
     for(i = 0; i < len; i++) {
-      if(strchr(allowedCharacters, buff[i]) == NULL)
-        return false;
+        if(strchr(allowedCharacters, buff[i]) == NULL)
+            return false;
+        if((buff[i] >= 48 && buff[i] <= 57) && (buff[i+1] == 43 || buff[i+1] == 45) && !(buff[i+2] >= 48 && buff[i+2] <= 57))
+            return false;
     }
     return true;
 }
@@ -117,7 +114,7 @@ int32_t processData(const char* buff, size_t len) {
             prev_action = -1;
             curr_numb = 0;
         }
-        if(buff[i] == '\r' || buff[i] == '\n') break;
+        if((buff[i] == '\r' && buff[i+1] == '\n') || buff[i] == '\n') break;
     }
     result += prev_action * curr_numb;
     return result;
