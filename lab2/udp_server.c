@@ -53,7 +53,6 @@ int main(int argc, char *argv[])
         }
 
         printf("Received %ld bytes\n", cnt);
-        puts(buff);
 
         memcpy(buff, "Hello, world!\r\n", 15);
         if(sendto(lst_sock, (char *) buff, 15, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
