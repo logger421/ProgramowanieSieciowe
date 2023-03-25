@@ -1,6 +1,8 @@
 // Szkielet serwera UDP/IPv4.
 
 #define _POSIX_C_SOURCE 200809L
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,10 +11,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <limits.h>
 #include <ctype.h>
 
 const int MAX_UDP = 65536;
+int OVERFLOW_ERR = 0;
 
 bool validateData(const char * buff, size_t len);
 int32_t processData(const char* buff, size_t len);
@@ -63,6 +65,16 @@ int main(int argc, char *argv[])
             }
         } else {
             result = processData(buff, cnt);
+            if(OVERFLOW_ERR == 1) {
+                fprintf(stderr, "overflow/underflow");
+                memcpy(buff, "ERROR\r\n", 7);
+                if(sendto(lst_sock, (char *) buff, 7, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+                    perror("sendto");
+                    return 1;
+                }
+                OVERFLOW_ERR = 0;
+                continue;
+            }
             if((cnt = sprintf(buff, "%d\r\n", result)) == -1) {
                 perror("sprintf");
                 return 1;
@@ -96,8 +108,8 @@ bool validateData(const char * buff, size_t len) {
 }
 
 int32_t processData(const char* buff, size_t len) {
-    int32_t result = 0;
-    int32_t curr_numb = 0;
+    int64_t result = 0;
+    int64_t curr_numb = 0;
     int prev_action = 1;
     int i;
     for (i = 0; i < len; i++) {
@@ -106,16 +118,32 @@ int32_t processData(const char* buff, size_t len) {
         }
         else if (buff[i] == '+') {
             result += prev_action * curr_numb;
+            if(result > INT32_MAX) {
+                OVERFLOW_ERR = 1;
+                return (int32_t) result;
+            }
             prev_action = 1;
             curr_numb = 0;
         }
         else if (buff[i] == '-') {
             result += prev_action * curr_numb;
+            if(result < INT32_MIN) {
+                OVERFLOW_ERR = 1;
+                return (int32_t) result;
+            }
             prev_action = -1;
             curr_numb = 0;
         }
         if((buff[i] == '\r' && buff[i+1] == '\n') || buff[i] == '\n') break;
     }
     result += prev_action * curr_numb;
-    return result;
+    if(result < INT32_MIN) {
+        OVERFLOW_ERR = 1;
+        return (int32_t) result;
+    }
+    if(result > INT32_MAX) {
+        OVERFLOW_ERR = 1;
+        return (int32_t) result;
+    }
+    return (int32_t) result;
 }
