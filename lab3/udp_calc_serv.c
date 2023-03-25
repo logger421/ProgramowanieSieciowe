@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
                 return 1;
             }
         } else {
-            result = processData(buff, cnt-1);
+            result = processData(buff, cnt);
             if((cnt = sprintf(buff, "%d\r\n", result)) == -1) {
                 perror("sprintf");
                 return 1;
