@@ -26,13 +26,14 @@ for file in "${files[@]}"; do
 
   postfix=$(echo "$file" | grep -oP "(?<=-).*?(?=\.)")
 
-  diff -s results/wynik-z-serwera.txt tests/"$postfix"-wynik.txt
+  diff -q results/wynik-z-serwera.txt tests/"$postfix"-wynik.txt
 
   if [ $? -eq 0 ];
   then
-  	echo 'Test finished sucessfully!'
+  	echo "- TEST "$file" finished sucessfully!"
   else
-  	echo 'Test failed'
+
+  	echo "- TEST "$file" failed"
   fi
 done
 
