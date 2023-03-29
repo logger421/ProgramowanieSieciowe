@@ -44,22 +44,27 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    // struktura reprezentująca odebrany adres klienta
-    struct sockaddr_in cliaddr;
-    memset(&cliaddr, 0, sizeof(cliaddr));
-    socklen_t len = sizeof(cliaddr);
+
 
     bool keep_on_handling_clients = true;
     while(keep_on_handling_clients) {
+        // struktura reprezentująca odebrany adres klienta
+        struct sockaddr_in cliaddr;
+        memset(&cliaddr, 0, sizeof(cliaddr));
+
+        socklen_t len = sizeof(cliaddr);
+
         cnt = recvfrom(lst_sock, (char *)buff, MAX_UDP, MSG_WAITALL, (struct sockaddr *) &cliaddr, &len);
         if(cnt == -1) {
             perror("recvfrom");
             return 1;
         }
+
         printf("Received %ld bytes\n", cnt);
+
         if(!validateData(buff, cnt)) {
-            memcpy(buff, "ERROR\r\n", 7);
-            if(sendto(lst_sock, (char *) buff, 7, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+            memcpy(buff, "ERROR", 5);
+            if(sendto(lst_sock, (char *) buff, 5, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
                 perror("sendto");
                 return 1;
             }
@@ -67,19 +72,20 @@ int main(int argc, char *argv[])
             result = processData(buff, cnt);
             if(OVERFLOW_ERR == 1) {
                 fprintf(stderr, "overflow/underflow\n");
-                memcpy(buff, "ERROR\r\n", 7);
-                if(sendto(lst_sock, (char *) buff, 7, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+                memcpy(buff, "ERROR", 5);
+                if(sendto(lst_sock, (char *) buff, 5, 0, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
                     perror("sendto");
                     return 1;
                 }
+
                 OVERFLOW_ERR = 0;
                 continue;
             }
-            if((cnt = sprintf(buff, "%d\r\n", result)) == -1) {
+            if((cnt = sprintf(buff, "%d", result)) == -1) {
                 perror("sprintf");
                 return 1;
             }
-            if(sendto(lst_sock, (char *) buff, cnt, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+            if(sendto(lst_sock, (char *) buff, cnt, 0, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
                 perror("sendto");
                 return 1;
             }
@@ -94,8 +100,8 @@ int main(int argc, char *argv[])
 }
 
 bool validateData(const char * buff, size_t len) {
-    char allowedCharacters[] = "0123456789+-\r\n";
-    if(isspace(buff[0]) || buff[0] == 43 || buff[0] == 45) 
+    char allowedCharacters[] = "0123456789+-";
+    if(isspace(buff[0]) || buff[0] == '-' || buff[0] == '+')
         return false;
     int i;
     for(i = 0; i < len; i++) {
@@ -134,7 +140,6 @@ int32_t processData(const char* buff, size_t len) {
             prev_action = -1;
             curr_numb = 0;
         }
-        if((buff[i] == '\r' && buff[i+1] == '\n') || buff[i] == '\n') break;
     }
     result += prev_action * curr_numb;
     if(result < INT32_MIN) {
