@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 
         socklen_t len = sizeof(cliaddr);
 
-        cnt = recvfrom(lst_sock, (char *)buff, MAX_UDP, MSG_WAITALL, (struct sockaddr *) &cliaddr, &len);
+        cnt = recvfrom(lst_sock, (char *)buff, MAX_UDP, 0, (struct sockaddr *) &cliaddr, &len);
         if(cnt == -1) {
             perror("recvfrom");
             return 1;
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 
         if(!validateData(buff, cnt)) {
             memcpy(buff, "ERROR", 5);
-            if(sendto(lst_sock, (char *) buff, 5, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+            if(sendto(lst_sock, (char *) buff, 5, 0, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
                 perror("sendto");
                 return 1;
             }

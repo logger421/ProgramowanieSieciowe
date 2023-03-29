@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 
     bool keep_on_handling_clients = true;
     while(keep_on_handling_clients) {
-        cnt = recvfrom(lst_sock, (char *)buff, 32, MSG_WAITALL, (struct sockaddr *) &cliaddr, &len);
+        cnt = recvfrom(lst_sock, (char *)buff, 32, 0, (struct sockaddr *) &cliaddr, &len);
         if(cnt == -1) {
             perror("recvfrom");
             return 1;
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
         puts(buff);
 
         memcpy(buff, "Hello, world!\r\n", 15);
-        if(sendto(lst_sock, (char *) buff, 15, MSG_WAITALL, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
+        if(sendto(lst_sock, (char *) buff, 15, 0, (struct sockaddr *) &cliaddr, sizeof(cliaddr)) == -1) {
             perror("sendto");
             return 1;
         }
