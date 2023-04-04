@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 
 bool validateData(const char * buff, size_t len) {
     char allowedCharacters[] = "0123456789+-";
-    if(isspace(buff[0]) || buff[0] == '-' || buff[0] == '+')
+    if(isspace(buff[0]) || buff[0] == '-' || buff[0] == '+' || buff[len] == '\0')
         return false;
     int i;
     for(i = 0; i < len; i++) {
