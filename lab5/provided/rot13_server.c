@@ -41,8 +41,7 @@
 
 // Standardowa procedura tworząca nasłuchujące gniazdko TCP.
 
-int listening_socket_tcp_ipv4(in_port_t port)
-{
+int listening_socket_tcp_ipv4(in_port_t port) {
     int s;
 
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -77,8 +76,7 @@ int listening_socket_tcp_ipv4(in_port_t port)
 // o znacznik czasu oraz identyfikatory procesu/wątku. Będą używane do
 // raportowania przebiegu pozostałych operacji we-wy.
 
-void log_printf(const char * fmt, ...)
-{
+void log_printf(const char *fmt, ...) {
     // bufor na przyrostowo budowany komunikat, len mówi ile już znaków ma
     char buf[1024];
     int len = 0;
@@ -122,21 +120,18 @@ void log_printf(const char * fmt, ...)
     write(1, buf, len + 1);
 }
 
-void log_perror(const char * msg)
-{
+void log_perror(const char *msg) {
     log_printf("%s: %s", msg, strerror(errno));
 }
 
-void log_error(const char * msg, int errnum)
-{
+void log_error(const char *msg, int errnum) {
     log_printf("%s: %s", msg, strerror(errnum));
 }
 
 // Pomocnicze funkcje wykonujące pojedynczą operację we-wy oraz wypisujące
 // szczegółowe komunikaty o jej działaniu.
 
-int accept_verbose(int srv_sock)
-{
+int accept_verbose(int srv_sock) {
     struct sockaddr_in a;
     socklen_t a_len = sizeof(a);
 
@@ -156,8 +151,7 @@ int accept_verbose(int srv_sock)
     return rv;
 }
 
-ssize_t read_verbose(int fd, void * buf, size_t nbytes)
-{
+ssize_t read_verbose(int fd, void *buf, size_t nbytes) {
     log_printf("calling read() on descriptor %i", fd);
     ssize_t rv = read(fd, buf, nbytes);
     if (rv == -1) {
@@ -168,8 +162,7 @@ ssize_t read_verbose(int fd, void * buf, size_t nbytes)
     return rv;
 }
 
-ssize_t write_verbose(int fd, void * buf, size_t nbytes)
-{
+ssize_t write_verbose(int fd, void *buf, size_t nbytes) {
     log_printf("calling write() on descriptor %i", fd);
     ssize_t rv = write(fd, buf, nbytes);
     if (rv == -1) {
@@ -183,8 +176,7 @@ ssize_t write_verbose(int fd, void * buf, size_t nbytes)
     return rv;
 }
 
-int close_verbose(int fd)
-{
+int close_verbose(int fd) {
     log_printf("closing descriptor %i", fd);
     int rv = close(fd);
     if (rv == -1) {
@@ -195,10 +187,9 @@ int close_verbose(int fd)
 
 // Procedury przetwarzające pojedynczą porcję danych przysłaną przez klienta.
 
-void rot13(char * data, size_t data_len)
-{
-    char * p = data;
-    char * e = data + data_len;
+void rot13(char *data, size_t data_len) {
+    char *p = data;
+    char *e = data + data_len;
     for (; p < e; ++p) {
         if (*p >= 'a' && *p <= 'z') {
             *p = (*p - 'a' + 13) % 26 + 'a';
@@ -208,8 +199,7 @@ void rot13(char * data, size_t data_len)
     }
 }
 
-ssize_t read_rot13_write(int sock)
-{
+ssize_t read_rot13_write(int sock) {
     char buf[4096];
 
     ssize_t bytes_read = read_verbose(sock, buf, sizeof(buf));
@@ -219,7 +209,7 @@ ssize_t read_rot13_write(int sock)
 
     rot13(buf, bytes_read);
 
-    char * data = buf;
+    char *data = buf;
     size_t data_len = bytes_read;
     while (data_len > 0) {
         ssize_t bytes_written = write_verbose(sock, data, data_len);
@@ -236,16 +226,14 @@ ssize_t read_rot13_write(int sock)
 // Teraz implementacje różnych typów głównej pętli serwera. Na początek
 // serwer iteracyjny, potrafiący obsługiwać tylko jednego klienta na raz.
 
-void iterative_loop(int srv_sock)
-{
+void iterative_loop(int srv_sock) {
     while (true) {
         int s = accept_verbose(srv_sock);
         if (s == -1) {
             break;
         }
 
-        while (read_rot13_write(s) > 0) {
-            ;
+        while (read_rot13_write(s) > 0) { ;
         }
         close_verbose(s);
     }
@@ -262,8 +250,7 @@ void iterative_loop(int srv_sock)
 // Dzięki temu proces-rodzic może poprosić jądro o informacje dot. sposobu,
 // w jaki dziecko zakończyło działanie, i dopiero wtedy zombie jest usuwany.
 
-void forking_loop(int srv_sock)
-{
+void forking_loop(int srv_sock) {
     // daj znać jądru że nie będziemy prosić o statusy dzieci; od razu po
     // zakończeniu działania można usunąć ich wpisy w tablicy procesów
     if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
@@ -287,8 +274,7 @@ void forking_loop(int srv_sock)
             log_printf("child process started");
             close_verbose(srv_sock);
 
-            while (read_rot13_write(s) > 0) {
-                ;
+            while (read_rot13_write(s) > 0) { ;
             }
             close_verbose(s);
 
@@ -314,13 +300,11 @@ void forking_loop(int srv_sock)
 // poprosi jądro o wynik przez nie zwrócony. Jeśli tego nie chcemy, trzeba
 // wątkom ustawić atrybut "detached".
 
-void * client_thread(void * arg)
-{
+void *client_thread(void *arg) {
     log_printf("thread started");
-    int s = *( (int *) arg );
+    int s = *((int *) arg);
 
-    while (read_rot13_write(s) > 0) {
-        ;
+    while (read_rot13_write(s) > 0) { ;
     }
     close_verbose(s);
 
@@ -330,8 +314,7 @@ void * client_thread(void * arg)
     return NULL;
 }
 
-void multithreaded_loop(int srv_sock)
-{
+void multithreaded_loop(int srv_sock) {
     pthread_attr_t attr;
     int errnum;
 
@@ -354,7 +337,7 @@ void multithreaded_loop(int srv_sock)
             break;
         }
 
-        int * p = (int *) malloc(sizeof(int));
+        int *p = (int *) malloc(sizeof(int));
         if (p == NULL) {
             log_printf("cannot allocate memory for thread argument");
             goto cleanup_sock;
@@ -403,8 +386,7 @@ void multithreaded_loop(int srv_sock)
 // liczby od 0 do FD_SETSIZE - 1. W dawnych czasach FD_SETSIZE mogło wynosić
 // np. 64 lub 256, we współczesnych dystrybucjach Linuksa jest równe 1024.
 
-void select_loop(int srv_sock)
-{
+void select_loop(int srv_sock) {
     fd_set sock_fds;    // zbiór deskryptorów otwartych gniazdek
     int max_fd;         // największy użyty numer deskryptora
 
@@ -426,7 +408,7 @@ void select_loop(int srv_sock)
         log_printf("number of ready to read descriptors = %i", num);
 
         for (int fd = 0; fd <= max_fd; ++fd) {
-            if (! FD_ISSET(fd, &read_ready_fds)) {
+            if (!FD_ISSET(fd, &read_ready_fds)) {
                 continue;
             }
 
@@ -489,8 +471,7 @@ void select_loop(int srv_sock)
 // i adres bufora w którym jądro zapisze te elementy zbioru, gdzie pojawiły
 // się interesujące nas zdarzenia.
 
-int add_fd_to_epoll(int fd, int epoll_fd)
-{
+int add_fd_to_epoll(int fd, int epoll_fd) {
     log_printf("adding descriptor %i to epoll instance %i", fd, epoll_fd);
     struct epoll_event ev;
     memset(&ev, 0, sizeof(ev));
@@ -503,8 +484,7 @@ int add_fd_to_epoll(int fd, int epoll_fd)
     return rv;
 }
 
-int remove_fd_from_epoll(int fd, int epoll_fd)
-{
+int remove_fd_from_epoll(int fd, int epoll_fd) {
     log_printf("removing descriptor %i from epoll instance %i", fd, epoll_fd);
     int rv = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
     if (rv == -1) {
@@ -515,8 +495,7 @@ int remove_fd_from_epoll(int fd, int epoll_fd)
 
 #define MAX_EVENTS 8
 
-void epoll_loop(int srv_sock)
-{
+void epoll_loop(int srv_sock) {
     // w dzisiejszych czasach wartość argumentu nie ma znaczenia
     int epoll_fd = epoll_create(10);
     if (epoll_fd == -1) {
@@ -598,18 +577,18 @@ void epoll_loop(int srv_sock)
 // Do napisania została jeszcze tylko funkcja main, i to będzie wszystko.
 
 const struct {
-    const char * name;
+    const char *name;
+
     void (*func_ptr)(int);
 } srv_modes[] = {
-        { "iterative", iterative_loop },
-        { "forking", forking_loop },
-        { "multithreaded", multithreaded_loop },
-        { "select", select_loop },
-        { "epoll", epoll_loop },
+        {"iterative",     iterative_loop},
+        {"forking",       forking_loop},
+        {"multithreaded", multithreaded_loop},
+        {"select",        select_loop},
+        {"epoll",         epoll_loop},
 };
 
-int main(int argc, char * argv[])
-{
+int main(int argc, char *argv[]) {
     long int srv_port;
     int srv_sock;
     void (*main_loop)(int);
@@ -632,7 +611,7 @@ int main(int argc, char * argv[])
         goto bad_args;
     }
 
-    char * p;
+    char *p;
     errno = 0;
     srv_port = strtol(argv[2], &p, 10);
     if (errno != 0 || *p != '\0' || srv_port < 1024 || srv_port > 65535) {
