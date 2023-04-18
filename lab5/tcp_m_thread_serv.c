@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 const bool KEEP_HANDLING_REQUESTS = true;
 // TODO(WL) Try to consolidate validation & calculating result.
@@ -17,8 +18,11 @@ int listening_socket_tcp_ipv4(in_port_t port);
 
 void thread_loop(int srv_sock);
 
-void *thread_service(void *args);
+void *thread_service(void *arg);
 
+ssize_t read_calc_write(int sock);
+
+void validate_calculate(char* buff, int bytes);
 
 int main(void) {
     int srv_port = 2020;
@@ -74,6 +78,41 @@ int listening_socket_tcp_ipv4(in_port_t port) {
     return -1;
 }
 
+void validate_calculate(char* buff, int bytes) {
+
+}
+
+
+ssize_t read_calc_write(int sock) {
+    char buf[4096];
+    ssize_t bytes = read(sock, buf, sizeof(buf));
+    if(bytes < 0) {
+        return -1;
+    }
+
+    validate_calculate(buf, bytes);
+
+    char* response = buf;
+
+    return 1;
+}
+
+void *thread_service(void *arg) {
+    int socket = *((int *) arg);
+
+    while (read_calc_write(socket) > 0) {
+        ;
+    }
+
+    if(close(socket) == -1) {
+        perror("close");
+        exit(-1);
+    }
+
+    free(arg);
+    return NULL;
+}
+
 void thread_loop(int srv_sock) {
     pthread_attr_t attr;
     int rc;
@@ -85,6 +124,7 @@ void thread_loop(int srv_sock) {
         return;
     }
 
+    // we want thread to be in detached state bc handling client req could take a lot of time.
     rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     if (rc != 0) {
         printf("pthread_attr_setdetachstate error rc=%d\n", rc);
@@ -94,8 +134,33 @@ void thread_loop(int srv_sock) {
     while (KEEP_HANDLING_REQUESTS) {
         struct sockaddr_in a;
         socklen_t a_len = sizeof(a);
-        int fd = accept(srv_sock, (struct sockaddr *) &a, &a_len);
 
+        int fd;
+        if( (fd = accept(srv_sock, (struct sockaddr *) &a, &a_len)) == -1) {
+            perror("accept");
+            exit(-2);
+        }
+
+        int *param = (int *) malloc(sizeof(int));
+        if(param == NULL) {
+            perror("malloc");
+            exit(0);
+        }
+
+        *param = fd;
+        pthread_t th;
+        if((rc = pthread_create(&th, &attr, thread_service, param)) != 0) {
+            printf("pthread_create error rc=%d\n", rc);
+            goto cleanup_sock;
+        }
+
+        continue;
+
+        cleanup_sock:
+        if(close(fd) == -1) {
+            perror("close");
+            exit(-1);
+        }
     }
 
     cleanup_attr:
@@ -103,13 +168,4 @@ void thread_loop(int srv_sock) {
     if (rc != 0) {
         printf("pthread_attr_destroy error rc=%d\n", rc);
     }
-}
-
-void *thread_service(void *args) {
-    int socket = *((int *) args);
-
-    while (KEEP_HANDLING_REQUESTS) {
-
-    }
-    return NULL;
 }
