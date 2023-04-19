@@ -7,6 +7,10 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <limits.h>
+#include <stdint.h>
 
 const bool KEEP_HANDLING_REQUESTS = true;
 // TODO(WL) Try to consolidate validation & calculating result.
@@ -20,9 +24,9 @@ void thread_loop(int srv_sock);
 
 void *thread_service(void *arg);
 
-ssize_t read_calc_write(int sock);
+ssize_t read_calculate_write(int sock, int32_t* result, int* prev_action);
 
-void validate_calculate(char* buff, int bytes);
+void validate_calculate(char *buff, size_t bytes, int32_t* result, int* prev_action);
 
 int main(void) {
     int srv_port = 2020;
@@ -78,38 +82,77 @@ int listening_socket_tcp_ipv4(in_port_t port) {
     return -1;
 }
 
-void validate_calculate(char* buff, int bytes) {
+void validate_calculate(char *buff, size_t bytes, int32_t* result, int* prev_action) {
+    const char allowedCharacters[] = "0123456789+-";
 
+    int64_t current = 0;
+
+    if (!isdigit(buff[0])) {
+        memcpy(buff, "ERROR\r\n", 7);
+        return;
+    }
+
+    for (int i = 0; i < bytes; i++) {
+        if (strchr(allowedCharacters, buff[i]) == NULL) {
+            memcpy(buff, "ERROR\r\n", 7);
+            break;
+        }
+
+        if(buff[i] == '\r' && buff[i+1] == '\n') {
+            *prev_action = 1;
+        }
+    }
 }
 
+ssize_t read_calculate_write(int sock, int32_t* result, int* prev_action) {
+    char buff[1024];
 
-ssize_t read_calc_write(int sock) {
-    char buf[4096];
-    ssize_t bytes = read(sock, buf, sizeof(buf));
-    if(bytes < 0) {
+    ssize_t bytes_read;
+    if((bytes_read = read(sock, buff, sizeof(buff))) < 0) {
         return -1;
     }
 
-    validate_calculate(buf, bytes);
+    validate_calculate(buff, bytes_read, result, prev_action);
 
-    char* response = buf;
+    int to_write;
+    char* to_send = buff;
+    if((to_write = sprintf(to_send, "%d\r\n", *result)) == -1) {
+        perror("sprintf");
+        return 1;
+    }
 
-    return 1;
+    ssize_t bytes_written;
+    while((bytes_written = write(sock, buff, to_write)) > 0) {
+        to_send = to_send + bytes_written;
+        to_write = to_write - bytes_written;
+    }
+    return bytes_read;
 }
 
 void *thread_service(void *arg) {
     int socket = *((int *) arg);
 
-    while (read_calc_write(socket) > 0) {
+    int32_t* result = (int32_t *) malloc(sizeof(int32_t));
+    if (result == NULL) {
+        printf("No memory for result variable allocation\n");
+        return NULL;
+    }
+
+    int* prev_action = (int *) malloc(sizeof(int));
+    *prev_action = 1;
+
+    while (read_calculate_write(socket, result, prev_action) > 0) {
         ;
     }
 
-    if(close(socket) == -1) {
+    if (close(socket) == -1) {
         perror("close");
         exit(-1);
     }
 
     free(arg);
+    free(result);
+    free(prev_action);
     return NULL;
 }
 
@@ -134,22 +177,23 @@ void thread_loop(int srv_sock) {
     while (KEEP_HANDLING_REQUESTS) {
         struct sockaddr_in a;
         socklen_t a_len = sizeof(a);
+        memset(&a, 0, sizeof(a_len));
 
-        int fd;
-        if( (fd = accept(srv_sock, (struct sockaddr *) &a, &a_len)) == -1) {
+        int cli_sock;
+        if ((cli_sock = accept(srv_sock, (struct sockaddr *) &a, &a_len)) == -1) {
             perror("accept");
             exit(-2);
         }
 
         int *param = (int *) malloc(sizeof(int));
-        if(param == NULL) {
+        if (param == NULL) {
             perror("malloc");
             exit(0);
         }
 
-        *param = fd;
+        *param = cli_sock;
         pthread_t th;
-        if((rc = pthread_create(&th, &attr, thread_service, param)) != 0) {
+        if ((rc = pthread_create(&th, &attr, thread_service, param)) != 0) {
             printf("pthread_create error rc=%d\n", rc);
             goto cleanup_sock;
         }
@@ -157,7 +201,7 @@ void thread_loop(int srv_sock) {
         continue;
 
         cleanup_sock:
-        if(close(fd) == -1) {
+        if (close(cli_sock) == -1) {
             perror("close");
             exit(-1);
         }
