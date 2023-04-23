@@ -9,11 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <limits.h>
 #include <stdint.h>
 
 const bool KEEP_HANDLING_REQUESTS = true;
-
+const int MAX_BUFF = 1024;
 // creates tcp ipv4 listening socket
 int listening_socket_tcp_ipv4(in_port_t port);
 
@@ -81,6 +80,7 @@ int listening_socket_tcp_ipv4(in_port_t port) {
 
 int validate_calculate(char *buff, size_t bytes) {
     const char allowedCharacters[] = "0123456789+-\r\n";
+
     int prev_action = 1;
     int64_t current = 0;
     int64_t part_of_result = 0;
@@ -104,6 +104,8 @@ int validate_calculate(char *buff, size_t bytes) {
             if(part_of_result > INT32_MAX) {
                 goto signal_error;
             }
+            prev_action = 1;
+            current = 0;
         }
         else if(buff[i] == '-') {
             part_of_result += prev_action * current;
@@ -112,13 +114,15 @@ int validate_calculate(char *buff, size_t bytes) {
             if(part_of_result < INT32_MIN) {
                 goto signal_error;
             }
+            prev_action = -1;
+            current = 0;
         }
     }
     part_of_result += prev_action * current;
     if((part_of_result > INT32_MAX) || (part_of_result < INT32_MIN)) {
         goto signal_error;
     }
-
+    printf("Calc part of result=%d\n", part_of_result);
     int written;
     if((written = sprintf(buff, "%d\r\n", (int32_t) part_of_result)) == -1 ) {
         perror("sprintf");
@@ -139,13 +143,14 @@ int validate_calculate(char *buff, size_t bytes) {
 }
 
 ssize_t read_calculate_write(int sock) {
-    char buff[1024];
+    char buff[MAX_BUFF];
 
     ssize_t bytes_read;
-    if((bytes_read = read(sock, buff, sizeof(buff))) < 0) {
+    if((bytes_read = read(sock, buff, MAX_BUFF)) < 0) {
         return -1;
     }
 
+    printf("Data received:\n%s", buff);
     int to_write = validate_calculate(buff, bytes_read);
 
     char* to_send = buff;
@@ -161,18 +166,23 @@ ssize_t read_calculate_write(int sock) {
             perror("write");
             return -1;
         }
+        memset(buff, 0, MAX_BUFF);
     }
     else if(to_write == -2) {
+        memset(buff, 0, MAX_BUFF);
         return -2;
     }
+    else {
+        while((bytes_written = write(sock, buff, to_write)) > 0) {
+            to_send = to_send + bytes_written;
+            to_write = to_write - bytes_written;
+        }
+        if(bytes_written < 0) {
+            perror("write");
+            return -1;
+        }
+        memset(buff, 0, MAX_BUFF);
 
-    while((bytes_written = write(sock, buff, to_write)) > 0) {
-        to_send = to_send + bytes_written;
-        to_write = to_write - bytes_written;
-    }
-    if(bytes_written < 0) {
-        perror("write");
-        return -1;
     }
 
     return bytes_read;
@@ -180,11 +190,27 @@ ssize_t read_calculate_write(int sock) {
 
 void *thread_service(void *arg) {
     int socket = *((int *) arg);
-    printf("Thread for socket=%d created\n", socket);
-    while (read_calculate_write(socket)) {
+
+    // not used yet
+    int *prev_action = (int *) malloc(sizeof(int));
+    if (prev_action == NULL) {
+        perror("malloc");
+        exit(0);
+    }
+
+    // not used yet
+    int32_t *result = (int32_t *) malloc(sizeof(int32_t));
+    if (result == NULL) {
+        perror("malloc");
+        exit(0);
+    }
+
+    printf("Serving socket=%d\n", socket);
+    while (read_calculate_write(socket) > 0) {
         ;
     }
 
+    printf("Closing socket=%d\n", socket);
     if (close(socket) == -1) {
         perror("close");
         exit(-1);
@@ -192,7 +218,8 @@ void *thread_service(void *arg) {
 
     // free alocated memory.
     free(arg);
-
+    free(result);
+    free(prev_action);
     return NULL;
 }
 
@@ -224,6 +251,7 @@ void thread_loop(int srv_sock) {
             perror("accept");
             exit(-2);
         }
+        puts("New client accepted");
 
         int *param = (int *) malloc(sizeof(int));
         if (param == NULL) {
@@ -237,9 +265,11 @@ void thread_loop(int srv_sock) {
             printf("pthread_create error rc=%d\n", rc);
             goto cleanup_sock;
         }
+        puts("New pthread created");
 
         continue;
 
+        // if error occurred while creating thread.
         cleanup_sock:
         if (close(cli_sock) == -1) {
             perror("close");
@@ -247,6 +277,7 @@ void thread_loop(int srv_sock) {
         }
     }
 
+    // if error occurred while creating thread attribute.
     cleanup_attr:
     rc = pthread_attr_destroy(&attr);
     if (rc != 0) {
