@@ -151,20 +151,8 @@ ssize_t read_calculate_write(int sock) {
 
     char* to_send = buff;
     ssize_t bytes_written;
-    if(to_write == -1) {
-        // ERROR\r\n
-        to_write = 7;
-        while((bytes_written = write(sock, buff, to_write)) > 0) {
-            to_send = to_send + bytes_written;
-            to_write = to_write - bytes_written;
-        }
-        if(bytes_written < 0) {
-            perror("write");
-            return -1;
-        }
-        memset(buff, 0, MAX_BUFF);
-    }
-    else if(to_write == -2) {
+
+    if(to_write == -2) {
         memset(buff, 0, MAX_BUFF);
         return -2;
     }
