@@ -13,9 +13,6 @@
 #include <stdint.h>
 
 const bool KEEP_HANDLING_REQUESTS = true;
-// TODO(WL) Try to consolidate validation & calculating result.
-// validate_data();
-// calculate_result();
 
 // creates tcp ipv4 listening socket
 int listening_socket_tcp_ipv4(in_port_t port);
@@ -24,9 +21,9 @@ void thread_loop(int srv_sock);
 
 void *thread_service(void *arg);
 
-ssize_t read_calculate_write(int sock, int32_t* result, int* prev_action);
+ssize_t read_calculate_write(int sock);
 
-void validate_calculate(char *buff, size_t bytes, int32_t* result, int* prev_action);
+int validate_calculate(char *buff, size_t bytes);
 
 int main(void) {
     int srv_port = 2020;
@@ -36,7 +33,7 @@ int main(void) {
 
     printf("Listening on port 2020\n");
     if ((srv_sock = listening_socket_tcp_ipv4(srv_port)) == -1) {
-        return 1;
+        return -1;
     }
 
     printf("Staring main loop\n");
@@ -45,7 +42,7 @@ int main(void) {
 
     if (close(srv_sock) == -1) {
         perror("close");
-        return 1;
+        return -1;
     }
 
     return 0;
@@ -82,29 +79,66 @@ int listening_socket_tcp_ipv4(in_port_t port) {
     return -1;
 }
 
-void validate_calculate(char *buff, size_t bytes, int32_t* result, int* prev_action) {
-    const char allowedCharacters[] = "0123456789+-";
-
+int validate_calculate(char *buff, size_t bytes) {
+    const char allowedCharacters[] = "0123456789+-\r\n";
+    int prev_action = 1;
     int64_t current = 0;
+    int64_t part_of_result = 0;
 
     if (!isdigit(buff[0])) {
-        memcpy(buff, "ERROR\r\n", 7);
-        return;
+        goto signal_invalid_character;
     }
 
     for (int i = 0; i < bytes; i++) {
         if (strchr(allowedCharacters, buff[i]) == NULL) {
-            memcpy(buff, "ERROR\r\n", 7);
-            break;
+            goto signal_invalid_character;
         }
 
-        if(buff[i] == '\r' && buff[i+1] == '\n') {
-            *prev_action = 1;
+        if (isdigit(buff[i])) {
+            current = current * 10 + (buff[i] - '0');
+        }
+        else if (buff[i] == '+') {
+            part_of_result += prev_action * current;
+
+            // check overflow after addition.
+            if(part_of_result > INT32_MAX) {
+                goto signal_error;
+            }
+        }
+        else if(buff[i] == '-') {
+            part_of_result += prev_action * current;
+
+            // check underflow after subtract.
+            if(part_of_result < INT32_MIN) {
+                goto signal_error;
+            }
         }
     }
+    part_of_result += prev_action * current;
+    if((part_of_result > INT32_MAX) || (part_of_result < INT32_MIN)) {
+        goto signal_error;
+    }
+
+    int written;
+    if((written = sprintf(buff, "%d\r\n", (int32_t) part_of_result)) == -1 ) {
+        perror("sprintf");
+        return -2;
+    }
+
+    return written;
+
+    signal_invalid_character:
+    fprintf(stderr, "invalid character in buffer\n");
+    memcpy(buff, "ERROR\r\n", 7);
+    return -1;
+
+    signal_error:
+    fprintf(stderr, "overflow/underflow\n");
+    memcpy(buff, "ERROR\r\n", 7);
+    return -1;
 }
 
-ssize_t read_calculate_write(int sock, int32_t* result, int* prev_action) {
+ssize_t read_calculate_write(int sock) {
     char buff[1024];
 
     ssize_t bytes_read;
@@ -112,36 +146,42 @@ ssize_t read_calculate_write(int sock, int32_t* result, int* prev_action) {
         return -1;
     }
 
-    validate_calculate(buff, bytes_read, result, prev_action);
+    int to_write = validate_calculate(buff, bytes_read);
 
-    int to_write;
     char* to_send = buff;
-    if((to_write = sprintf(to_send, "%d\r\n", *result)) == -1) {
-        perror("sprintf");
-        return 1;
+    ssize_t bytes_written;
+    if(to_write == -1) {
+        // ERROR\r\n
+        to_write = 7;
+        while((bytes_written = write(sock, buff, to_write)) > 0) {
+            to_send = to_send + bytes_written;
+            to_write = to_write - bytes_written;
+        }
+        if(bytes_written < 0) {
+            perror("write");
+            return -1;
+        }
+    }
+    else if(to_write == -2) {
+        return -2;
     }
 
-    ssize_t bytes_written;
     while((bytes_written = write(sock, buff, to_write)) > 0) {
         to_send = to_send + bytes_written;
         to_write = to_write - bytes_written;
     }
+    if(bytes_written < 0) {
+        perror("write");
+        return -1;
+    }
+
     return bytes_read;
 }
 
 void *thread_service(void *arg) {
     int socket = *((int *) arg);
-
-    int32_t* result = (int32_t *) malloc(sizeof(int32_t));
-    if (result == NULL) {
-        printf("No memory for result variable allocation\n");
-        return NULL;
-    }
-
-    int* prev_action = (int *) malloc(sizeof(int));
-    *prev_action = 1;
-
-    while (read_calculate_write(socket, result, prev_action) > 0) {
+    printf("Thread for socket=%d created\n", socket);
+    while (read_calculate_write(socket)) {
         ;
     }
 
@@ -150,9 +190,9 @@ void *thread_service(void *arg) {
         exit(-1);
     }
 
+    // free alocated memory.
     free(arg);
-    free(result);
-    free(prev_action);
+
     return NULL;
 }
 
