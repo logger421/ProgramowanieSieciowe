@@ -13,37 +13,31 @@
 
 const bool KEEP_HANDLING_REQUESTS = true;
 const int MAX_BUFF = 1024;
+
 // creates tcp ipv4 listening socket
 int listening_socket_tcp_ipv4(in_port_t port);
-
-void thread_loop(int srv_sock);
-
-void *thread_service(void *arg);
-
-ssize_t read_calculate_write(int sock);
-
 int validate_calculate(char *buff, size_t bytes);
+ssize_t read_calculate_write(int sock);
+void *thread_service(void *arg);
+void thread_loop(int srv_sock);
 
 int main(void) {
     int srv_port = 2020;
     int srv_sock;
-    // for fun to try function pointers.
+    // for fun, to try function pointers.
     void (*main_loop)(int) = &thread_loop;
 
-    printf("Listening on port 2020\n");
     if ((srv_sock = listening_socket_tcp_ipv4(srv_port)) == -1) {
         return -1;
     }
-
-    printf("Staring main loop\n");
+    puts("Server started, listening on port: 2020");
     main_loop(srv_sock);
-    printf("Done with main loop\n");
 
     if (close(srv_sock) == -1) {
         perror("close");
         return -1;
     }
-
+    puts("Server listening socket closed");
     return 0;
 }
 
@@ -80,66 +74,68 @@ int listening_socket_tcp_ipv4(in_port_t port) {
 
 int validate_calculate(char *buff, size_t bytes) {
     const char allowedCharacters[] = "0123456789+-\r\n";
+    char *token;
+    char *saveptr;
+    int written = 0;
 
-    int prev_action = 1;
-    int64_t current = 0;
-    int64_t part_of_result = 0;
+    token = strtok_r(buff, "\r\n", &saveptr);
+    while (token != NULL) {
+        int prev_action = 1;
+        int64_t current = 0;
+        int64_t part_of_result = 0;
 
-    if (!isdigit(buff[0])) {
-        goto signal_invalid_character;
-    }
-
-    for (int i = 0; i < bytes; i++) {
-        if (strchr(allowedCharacters, buff[i]) == NULL) {
-            goto signal_invalid_character;
-        }
-
-        if (isdigit(buff[i])) {
-            current = current * 10 + (buff[i] - '0');
-        }
-        else if (buff[i] == '+') {
-            part_of_result += prev_action * current;
-
-            // check overflow after addition.
-            if(part_of_result > INT32_MAX) {
-                goto signal_error;
+        for (int i = 0; i < strlen(token); i++) {
+            if (strchr(allowedCharacters, token[i]) == NULL) {
+                memcpy(buff + written, "ERROR\r\n", 7);
+                written += 7;
+                goto next_token;
             }
-            prev_action = 1;
-            current = 0;
-        }
-        else if(buff[i] == '-') {
-            part_of_result += prev_action * current;
 
-            // check underflow after subtract.
-            if(part_of_result < INT32_MIN) {
-                goto signal_error;
+            if (isdigit(token[i])) {
+                current = current * 10 + (token[i] - '0');
             }
-            prev_action = -1;
-            current = 0;
+            else if (token[i] == '+') {
+                part_of_result += prev_action * current;
+
+                // check overflow after addition.
+                if (part_of_result > INT32_MAX) {
+                    memcpy(buff + written, "ERROR\r\n", 7);
+                    written += 7;
+                    goto next_token;
+                }
+                prev_action = 1;
+                current = 0;
+            }
+            else if (token[i] == '-') {
+                part_of_result += prev_action * current;
+
+                // check underflow after subtract.
+                if (part_of_result < INT32_MIN) {
+                    memcpy(buff + written, "ERROR\r\n", 7);
+                    written += 7;
+                    goto next_token;
+                }
+                prev_action = -1;
+                current = 0;
+            }
         }
-    }
-    part_of_result += prev_action * current;
-    if((part_of_result > INT32_MAX) || (part_of_result < INT32_MIN)) {
-        goto signal_error;
-    }
-    printf("Calc part of result=%d\n", part_of_result);
-    int written;
-    if((written = sprintf(buff, "%d\r\n", (int32_t) part_of_result)) == -1 ) {
-        perror("sprintf");
-        return -2;
+        part_of_result += prev_action * current;
+        if ((part_of_result > INT32_MAX) || (part_of_result < INT32_MIN)) {
+            memcpy(buff + written, "ERROR\r\n", 7);
+            written += 7;
+            goto next_token;
+        }
+        printf("Calc part of result=%d\n", (int32_t)part_of_result);
+        if ((written += sprintf(buff + written, "%d\r\n", (int32_t)part_of_result)) == -1) {
+            perror("sprintf");
+            return -2;
+        }
+
+        next_token:
+        token = strtok_r(NULL, "\r\n", &saveptr);
     }
 
     return written;
-
-    signal_invalid_character:
-    fprintf(stderr, "invalid character in buffer\n");
-    memcpy(buff, "ERROR\r\n", 7);
-    return -1;
-
-    signal_error:
-    fprintf(stderr, "overflow/underflow\n");
-    memcpy(buff, "ERROR\r\n", 7);
-    return -1;
 }
 
 ssize_t read_calculate_write(int sock) {
@@ -150,7 +146,7 @@ ssize_t read_calculate_write(int sock) {
         return -1;
     }
 
-    printf("Data received:\n%s", buff);
+    printf("Data received:%s", buff);
     int to_write = validate_calculate(buff, bytes_read);
 
     char* to_send = buff;
@@ -189,37 +185,21 @@ ssize_t read_calculate_write(int sock) {
 }
 
 void *thread_service(void *arg) {
-    int socket = *((int *) arg);
+    int client_socket = *((int *) arg);
 
-    // not used yet
-    int *prev_action = (int *) malloc(sizeof(int));
-    if (prev_action == NULL) {
-        perror("malloc");
-        exit(0);
-    }
-
-    // not used yet
-    int32_t *result = (int32_t *) malloc(sizeof(int32_t));
-    if (result == NULL) {
-        perror("malloc");
-        exit(0);
-    }
-
-    printf("Serving socket=%d\n", socket);
-    while (read_calculate_write(socket) > 0) {
+    printf("Serving socket=%d\n", client_socket);
+    while (read_calculate_write(client_socket) > 0) {
         ;
     }
 
-    printf("Closing socket=%d\n", socket);
-    if (close(socket) == -1) {
+    printf("Closing socket=%d\n", client_socket);
+    if (close(client_socket) == -1) {
         perror("close");
         exit(-1);
     }
 
     // free alocated memory.
     free(arg);
-    free(result);
-    free(prev_action);
     return NULL;
 }
 
@@ -234,13 +214,14 @@ void thread_loop(int srv_sock) {
         return;
     }
 
-    // we want thread to be in detached state bc handling client req could take a lot of time.
+    // we want thread to be in detached state bc handling client requests could take time.
     rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     if (rc != 0) {
         printf("pthread_attr_setdetachstate error rc=%d\n", rc);
         goto cleanup_attr;
     }
 
+    // main loop, responsible for accepting client connections and passing them to threads.
     while (KEEP_HANDLING_REQUESTS) {
         struct sockaddr_in a;
         socklen_t a_len = sizeof(a);
@@ -248,15 +229,15 @@ void thread_loop(int srv_sock) {
 
         int cli_sock;
         if ((cli_sock = accept(srv_sock, (struct sockaddr *) &a, &a_len)) == -1) {
-            perror("accept");
-            exit(-2);
+            perror("Error occurred on accept function, connection refused.");
+            continue;
         }
         puts("New client accepted");
 
         int *param = (int *) malloc(sizeof(int));
         if (param == NULL) {
-            perror("malloc");
-            exit(0);
+            perror("Error occurred on malloc, connection refused.");
+            goto cleanup_sock;
         }
 
         *param = cli_sock;
@@ -273,7 +254,7 @@ void thread_loop(int srv_sock) {
         cleanup_sock:
         if (close(cli_sock) == -1) {
             perror("close");
-            exit(-1);
+            continue;
         }
     }
 
