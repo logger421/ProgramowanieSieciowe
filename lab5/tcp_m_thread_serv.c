@@ -16,9 +16,13 @@ const int MAX_BUFF = 1024;
 
 // creates tcp ipv4 listening socket
 int listening_socket_tcp_ipv4(in_port_t port);
+
 int validate_calculate(char *buff, size_t bytes);
+
 ssize_t read_calculate_write(int sock);
+
 void *thread_service(void *arg);
+
 void thread_loop(int srv_sock);
 
 int main(void) {
@@ -77,8 +81,8 @@ int validate_calculate(char *buff, size_t bytes) {
     char *token;
     char *saveptr;
     int written = 0;
-
     token = strtok_r(buff, "\r\n", &saveptr);
+
     while (token != NULL) {
         int prev_action = 1;
         int64_t current = 0;
@@ -93,8 +97,7 @@ int validate_calculate(char *buff, size_t bytes) {
 
             if (isdigit(token[i])) {
                 current = current * 10 + (token[i] - '0');
-            }
-            else if (token[i] == '+') {
+            } else if (token[i] == '+') {
                 part_of_result += prev_action * current;
 
                 // check overflow after addition.
@@ -105,8 +108,7 @@ int validate_calculate(char *buff, size_t bytes) {
                 }
                 prev_action = 1;
                 current = 0;
-            }
-            else if (token[i] == '-') {
+            } else if (token[i] == '-') {
                 part_of_result += prev_action * current;
 
                 // check underflow after subtract.
@@ -120,13 +122,15 @@ int validate_calculate(char *buff, size_t bytes) {
             }
         }
         part_of_result += prev_action * current;
+        prev_action = 1;
+        current = 0;
         if ((part_of_result > INT32_MAX) || (part_of_result < INT32_MIN)) {
             memcpy(buff + written, "ERROR\r\n", 7);
             written += 7;
             goto next_token;
         }
-        printf("Calc part of result=%d\n", (int32_t)part_of_result);
-        if ((written += sprintf(buff + written, "%d\r\n", (int32_t)part_of_result)) == -1) {
+        printf("Calc part of result=%d\n", (int32_t) part_of_result);
+        if ((written += sprintf(buff + written, "%d\r\n", (int32_t) part_of_result)) == -1) {
             perror("sprintf");
             return -2;
         }
@@ -142,42 +146,39 @@ ssize_t read_calculate_write(int sock) {
     char buff[MAX_BUFF];
 
     ssize_t bytes_read;
-    if((bytes_read = read(sock, buff, MAX_BUFF)) < 0) {
+    if ((bytes_read = read(sock, buff, MAX_BUFF)) < 0) {
         return -1;
     }
 
     printf("Data received:%s", buff);
     int to_write = validate_calculate(buff, bytes_read);
 
-    char* to_send = buff;
+    char *to_send = buff;
     ssize_t bytes_written;
 
-    if(to_write == -2) {
+    if (to_write == -2) {
         memset(buff, 0, MAX_BUFF);
         return -2;
-    }
-    else {
-        while((bytes_written = write(sock, buff, to_write)) > 0) {
+    } else {
+        while ((bytes_written = write(sock, buff, to_write)) > 0) {
             to_send = to_send + bytes_written;
             to_write = to_write - bytes_written;
         }
-        if(bytes_written < 0) {
+        if (bytes_written < 0) {
             perror("write");
             return -1;
         }
         memset(buff, 0, MAX_BUFF);
 
+        return bytes_read;
     }
-
-    return bytes_read;
 }
 
 void *thread_service(void *arg) {
     int client_socket = *((int *) arg);
 
     printf("Serving socket=%d\n", client_socket);
-    while (read_calculate_write(client_socket) > 0) {
-        ;
+    while (read_calculate_write(client_socket) > 0) { ;
     }
 
     printf("Closing socket=%d\n", client_socket);
@@ -195,16 +196,13 @@ void thread_loop(int srv_sock) {
     pthread_attr_t attr;
     int rc;
 
-    rc = pthread_attr_init(&attr);
-
-    if (rc != 0) {
+    if ((rc = pthread_attr_init(&attr)) != 0) {
         printf("pthread_attr_init error rc=%d\n", rc);
         return;
     }
 
     // we want thread to be in detached state bc handling client requests could take time.
-    rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    if (rc != 0) {
+    if ((rc = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED)) != 0) {
         printf("pthread_attr_setdetachstate error rc=%d\n", rc);
         goto cleanup_attr;
     }
