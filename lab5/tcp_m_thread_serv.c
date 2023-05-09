@@ -77,11 +77,16 @@ int listening_socket_tcp_ipv4(in_port_t port) {
 }
 
 int validate_calculate(char *buff, size_t bytes) {
-    const char allowedCharacters[] = "0123456789+-";
+    const char allowedCharacters[] = "0123456789+-\r\n";
     int written = 0;
     int prev_action = 1;
     int64_t current = 0;
     int64_t part_of_result = 0;
+
+    if(!(buff[bytes - 2] == '\r' && buff[bytes - 1] == '\n')) {
+        puts("invalid data, \\r\\n sequence missing");
+        return -1;
+    }
 
     for (int i = 0; i < bytes; i++) {
         if (strchr(allowedCharacters, buff[i]) == NULL) {
@@ -94,6 +99,7 @@ int validate_calculate(char *buff, size_t bytes) {
 
             // check overflow after addition.
             if (part_of_result > INT32_MAX) {
+                puts("Overflow/underflow error");
                 return -1;
             }
             prev_action = 1;
@@ -103,6 +109,7 @@ int validate_calculate(char *buff, size_t bytes) {
 
             // check underflow after subtract.
             if (part_of_result < INT32_MIN) {
+                puts("Overflow/underflow error");
                 return -1;
             }
             prev_action = -1;
@@ -111,6 +118,7 @@ int validate_calculate(char *buff, size_t bytes) {
     }
     part_of_result += prev_action * current;
     if ((part_of_result > INT32_MAX) || (part_of_result < INT32_MIN)) {
+        puts("Overflow/underflow error");
         return -1;
     }
 
@@ -123,7 +131,7 @@ int validate_calculate(char *buff, size_t bytes) {
     return written;
 }
 
-ssize_t read_calculate_write_v2(int sock) {
+ssize_t read_calculate_write(int sock) {
     char read_buff[MAX_BUFF];
     char to_process_buff[MAX_BUFF];
     char output_buff[MAX_BUFF];
@@ -148,19 +156,14 @@ ssize_t read_calculate_write_v2(int sock) {
                 // if end not found, wait for more data
                 break;
             }
-            if(*(end_ptr + 1) != '\n') {
-                goto send_error;
-            }
 
             // calculate the expression and prepare response
-            to_write = validate_calculate(input_ptr, end_ptr - input_ptr);
+            to_write = validate_calculate(input_ptr, end_ptr - input_ptr + 2);
             if (to_write == -1) {
-                send_error:
                 memcpy(output_buff, "ERROR\r\n", 7);
                 to_write = 7;
             } else {
-                snprintf(output_buff, MAX_BUFF, "%s", input_ptr);
-                to_write = strlen(output_buff);
+                to_write = snprintf(output_buff, MAX_BUFF, "%s", input_ptr);
             }
 
             // send response to client
@@ -175,7 +178,7 @@ ssize_t read_calculate_write_v2(int sock) {
                 to_write -= bytes_written;
             }
             // update input buffer and pointer
-            // +2 because
+            // +2 because of "\r\n" found with memchr.
             input_left -= (end_ptr - input_ptr + 2);
             input_ptr = end_ptr + 2;
         }
@@ -199,7 +202,7 @@ void *thread_service(void *arg) {
     int client_socket = *((int *) arg);
 
     printf("Serving socket=%d\n", client_socket);
-    if (read_calculate_write_v2(client_socket) != 0) {
+    if (read_calculate_write(client_socket) != 0) {
         puts("read_calculate_write error");
     }
 
