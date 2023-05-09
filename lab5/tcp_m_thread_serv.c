@@ -157,16 +157,17 @@ ssize_t read_calculate_write(int sock) {
                 break;
             }
 
-            // calculate the expression and prepare response
             to_write = validate_calculate(input_ptr, end_ptr - input_ptr + 2);
             if (to_write == -1) {
                 memcpy(output_buff, "ERROR\r\n", 7);
                 to_write = 7;
             } else {
-                to_write = snprintf(output_buff, MAX_BUFF, "%s", input_ptr);
+                if((to_write = snprintf(output_buff, MAX_BUFF, "%s", input_ptr) == -1)) {
+                    perror("snprintf");
+                    return -1;
+                }
             }
 
-            // send response to client
             char *to_send = output_buff;
             while (to_write > 0) {
                 bytes_written = write(sock, to_send, to_write);
@@ -177,8 +178,9 @@ ssize_t read_calculate_write(int sock) {
                 to_send += bytes_written;
                 to_write -= bytes_written;
             }
+
             // update input buffer and pointer
-            // +2 because of "\r\n" found with memchr.
+            // +2 because of existing "\r\n". Found with memchr end_ptr -> at position of '\r'.
             input_left -= (end_ptr - input_ptr + 2);
             input_ptr = end_ptr + 2;
         }
