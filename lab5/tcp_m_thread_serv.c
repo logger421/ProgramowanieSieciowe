@@ -162,10 +162,7 @@ ssize_t read_calculate_write(int sock) {
                 memcpy(output_buff, "ERROR\r\n", 7);
                 to_write = 7;
             } else {
-                if((to_write = snprintf(output_buff, MAX_BUFF, "%s", input_ptr) == -1)) {
-                    perror("snprintf");
-                    return -1;
-                }
+                to_write = snprintf(output_buff, MAX_BUFF, "%s", input_ptr);
             }
 
             char *to_send = output_buff;
