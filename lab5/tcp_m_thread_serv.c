@@ -143,6 +143,7 @@ ssize_t read_calculate_write(int sock) {
     int input_len = 0;
 
     while ((bytes_read = read(sock, read_buff, MAX_BUFF)) > 0) {
+        // TODO(WL) prevent security issue, memory leakage when client only sends new data, never terminating it with "\r\n".
         memcpy(to_process_buff + input_len, read_buff, bytes_read);
         input_len += bytes_read;
 
