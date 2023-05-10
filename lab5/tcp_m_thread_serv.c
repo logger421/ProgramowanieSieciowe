@@ -145,7 +145,7 @@ ssize_t read_calculate_write(int sock) {
     while ((bytes_read = read(sock, read_buff, MAX_BUFF)) > 0) {
         memcpy(to_process_buff + input_len, read_buff, bytes_read);
         input_len += bytes_read;
-        // puts(read_buff);
+
         char *input_ptr = to_process_buff;
         int input_left = input_len;
 
