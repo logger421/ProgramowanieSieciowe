@@ -10,6 +10,16 @@
 lab*/build
 lab*/*.o
 lab*/*.x
+
+.idea/
+lab*/.idea/
+lab*/target/
+lab*/out/
+
+lab*/**/.idea/
+lab*/**/target/
+lab*/**/out/
+
 .vscode/
 
 # Linker output
@@ -55,8 +65,3 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-
-.idea/
-lab7/.idea/
-lab7/target/
-lab7/out/
