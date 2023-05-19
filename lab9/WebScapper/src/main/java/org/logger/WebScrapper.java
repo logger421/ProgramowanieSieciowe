@@ -45,18 +45,21 @@ public class WebScrapper {
         }
         Elements currentWeatherPanel = doc.getElementsByClass("cur-con-weather-card");
         String contentHref = currentWeatherPanel.attr("href");
-        if (contentHref.equals("/en/pl/krakow/274455/current-weather/274455")) {
-            String title = currentWeatherPanel.select("h2.cur-con-weather-card__title").text();
-            String time = currentWeatherPanel.select("p.cur-con-weather-card__subtitle").text();
-            String temp = currentWeatherPanel.select("div.temp").text();
-            String windGusts = matchWindGusts(currentWeatherPanel
-                    .select("div.details-container div:nth-child(3)")
-                    .text());
-//                String humidity = currentWeatherPanel.select().text();
-            System.out.format("%s; %s: temperature: %s; humidity: ;wind gusts: %s;air quality: \n",
-                    time, title, temp, windGusts);
+        if (!contentHref.equals("/en/pl/krakow/274455/current-weather/274455")) {
+            formattedOutput = "Parsed content is invalid!";
         }
-        return formattedOutput.equals("") ? "ERROR" : formattedOutput;
+
+        String title = currentWeatherPanel.select("h2.cur-con-weather-card__title").text();
+        String time = currentWeatherPanel.select("p.cur-con-weather-card__subtitle").text();
+        String temp = currentWeatherPanel.select("div.temp").text();
+        String windGusts = matchWindGusts(currentWeatherPanel
+                .select("div.details-container div:nth-child(3)")
+                .text());
+//        String humidity = currentWeatherPanel.select().text();
+
+        formattedOutput = String.format("%s, Temperature: %s,Humidity: ,Wind gusts: %s,Air quality: \n",
+                time, temp, windGusts);
+        return formattedOutput.isEmpty() ? "ERROR" : formattedOutput;
     }
 
     private static String matchWindGusts(String s) {
@@ -69,10 +72,11 @@ public class WebScrapper {
         return "";
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         Document doc = getData();
         try {
-            parseDocument(doc);
+            String result = parseDocument(doc);
+            System.out.println(result);
         } catch (Exception ex) {
             System.exit(-1);
         }
