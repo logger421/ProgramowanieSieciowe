@@ -4,18 +4,17 @@ import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.helper.HttpConnection;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import javax.management.BadAttributeValueExpException;
 import java.io.IOException;
-import java.net.URL;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class WebScrapper {
     static private String url = "https://www.accuweather.com/en/pl/krakow/274455/weather-forecast/274455";
-
+    static private String windGustsRegex = ".*\\s+(?<target>\\d+\\skm/h)";
+    static private String airQualityRegex = "Air\\s+Quality\\s+(?<target>\\w*\\s*)";
 
     private WebScrapper() {
         // we don't want to instantiate this class
@@ -27,8 +26,7 @@ public class WebScrapper {
         } catch (IOException e) {
             if (e instanceof HttpStatusException) {
                 System.out.println("Status code != 200");
-            }
-            if (e instanceof java.net.MalformedURLException) {
+            } else if (e instanceof java.net.MalformedURLException) {
                 System.out.println("Request URL is not a http or https URL");
             } else {
                 e.printStackTrace();
@@ -52,32 +50,39 @@ public class WebScrapper {
         String title = currentWeatherPanel.select("h2.cur-con-weather-card__title").text();
         String time = currentWeatherPanel.select("p.cur-con-weather-card__subtitle").text();
         String temp = currentWeatherPanel.select("div.temp").text();
-        String windGusts = matchWindGusts(currentWeatherPanel
+        String windGusts = findMatch(windGustsRegex,
+                currentWeatherPanel
                 .select("div.details-container div:nth-child(3)")
                 .text());
-//        String humidity = currentWeatherPanel.select().text();
+        String airQuality = findMatch(airQualityRegex,
+                currentWeatherPanel
+                .select("div.details-container div:nth-child(1)")
+                .text());
 
-        formattedOutput = String.format("%s, Temperature: %s,Humidity: ,Wind gusts: %s,Air quality: \n",
-                time, temp, windGusts);
+        formattedOutput = String.format("%s,Temperature: %s,Wind gusts: %s,Air quality: %s", time, temp, windGusts,
+                airQuality);
+
         return formattedOutput.isEmpty() ? "ERROR" : formattedOutput;
     }
 
-    private static String matchWindGusts(String s) {
-        String regex = ".*\\s+(?<speed>\\d+\\skm/h)";
+    private static String findMatch(String regex, String s) {
         Pattern pattern = Pattern.compile(regex);
         Matcher mat = pattern.matcher(s);
+        String res = "";
         if (mat.matches()) {
-            return mat.group("speed");
+            res = mat.group("target");
         }
-        return "";
+        return res == null ? "" : res;
     }
 
     public static void main(String[] args) {
+        System.out.println("Weather shortcut for city: Cracow");
         Document doc = getData();
         try {
             String result = parseDocument(doc);
             System.out.println(result);
         } catch (Exception ex) {
+            ex.printStackTrace();
             System.exit(-1);
         }
         System.exit(0);
