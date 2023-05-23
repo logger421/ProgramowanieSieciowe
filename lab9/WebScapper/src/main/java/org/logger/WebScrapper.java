@@ -6,7 +6,6 @@ import org.jsoup.helper.HttpConnection;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
-import javax.management.BadAttributeValueExpException;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
