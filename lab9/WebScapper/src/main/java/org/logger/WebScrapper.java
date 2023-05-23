@@ -36,10 +36,10 @@ public class WebScrapper {
         return null;
     }
 
-    public static String parseDocument(Document doc) throws BadAttributeValueExpException {
+    public static String parseDocument(Document doc) throws NullPointerException {
         String formattedOutput = "";
         if (doc == null) {
-            throw new BadAttributeValueExpException("Passed doc argument is null");
+            throw new NullPointerException("Passed doc argument is null");
         }
         Elements currentWeatherPanel = doc.getElementsByClass("cur-con-weather-card");
         String contentHref = currentWeatherPanel.attr("href");
@@ -75,7 +75,7 @@ public class WebScrapper {
         return res == null ? "" : res;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args){
         System.out.println("Weather shortcut for city: Cracow");
         Document doc = getData();
         try {
