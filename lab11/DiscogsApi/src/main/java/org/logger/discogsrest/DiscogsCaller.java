@@ -1,27 +1,40 @@
 package org.logger.discogsrest;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 public class DiscogsCaller {
     public static void main(String[] args) {
         try {
-            URL url = new URL("");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("", "");
-
-            connection.connect();
-            if (connection.getResponseCode() != 200) {
-                System.exit(-1);
+            HttpRequest getRequest =
+                    HttpRequest
+                    .newBuilder()
+                    .uri(new URI("https://api.discogs.com/artists/359282/releases"))
+                    .header("user-agent", "Logger421/app/1.0").GET().build();
+            HttpClient httpClient = HttpClient.newHttpClient();
+            HttpResponse<String> response = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString());
+            System.out.println(response.statusCode());
+            JSONObject object = new JSONObject(response.body());
+            JSONArray albums = object.getJSONArray("releases");
+            System.out.println(albums.length());
+            for(int i = 0; i < albums.length(); i++) {
+                JSONObject album = albums.getJSONObject(i);
+                String printAlbumInfo = String.format("%s (%s): %s",
+                        album.getString("artist"),
+                        album.getInt("year"),
+                        album.getString("title"));
+                System.out.println(printAlbumInfo);
             }
-        } catch (MalformedURLException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
+
+        } catch (URISyntaxException | IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
-
 }
