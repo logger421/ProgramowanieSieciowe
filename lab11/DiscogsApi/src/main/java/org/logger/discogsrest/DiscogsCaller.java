@@ -32,7 +32,6 @@ public class DiscogsCaller {
                         album.getString("title"));
                 System.out.println(printAlbumInfo);
             }
-
         } catch (URISyntaxException | IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
