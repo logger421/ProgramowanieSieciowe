@@ -11,11 +11,19 @@
 #include <ctype.h>
 #include <stdint.h>
 
+enum {
+    ipv4, ipv6, ipv6only
+} mode;
+
 const bool KEEP_HANDLING_REQUESTS = true;
 const int MAX_BUFF = 1024;
 
+void print_sockaddr(const char *msg, struct sockaddr_storage *ssp);
+
+void make_sockaddr_for_binding(const int port, struct sockaddr_storage *ssp);
+
 // creates tcp ipv4 listening socket
-int listening_socket_tcp_ipv4(in_port_t port);
+int listening_socket_tcp(in_port_t port, struct sockaddr_storage *ssp);
 
 int validate_calculate(char *buff, size_t bytes);
 
@@ -25,15 +33,62 @@ void *thread_service(void *arg);
 
 void thread_loop(int srv_sock);
 
-int main(void) {
+int main(int argc, char *argv[]) {
+//    ./a.out [ipv4, ipv6, ipv6only]
+    if (argc != 2) {
+        puts("Bad args! Should be: ./a.out ipv4 | ipv6 | ipv6only");
+        return -1;
+    }
+
+    if (0 == strcmp(argv[1], "ipv4")) {
+        mode = ipv4;
+    } else if (0 == strcmp(argv[1], "ipv6")) {
+        mode = ipv6;
+    } else if (0 == strcmp(argv[1], "ipv6only")) {
+        mode = ipv6only;
+    } else {
+        puts("Bad args! Should be: ./a.out ipv4 | ipv6 | ipv6only");
+        return -1;
+    }
+
     int srv_port = 2020;
-    int srv_sock;
+    struct sockaddr_storage addr;
     // for fun, to try function pointers.
     void (*main_loop)(int) = &thread_loop;
 
-    if ((srv_sock = listening_socket_tcp_ipv4(srv_port)) == -1) {
-        return -1;
+    make_sockaddr_for_binding(srv_port, &addr);
+
+    print_sockaddr("command line arguments specify", &addr);
+
+    int srv_sock;
+
+    if (mode == ipv4) {
+        srv_sock = socket(AF_INET, SOCK_STREAM, 0);
+    } else {
+        srv_sock = socket(AF_INET6, SOCK_STREAM, 0);
     }
+    if (srv_sock == -1) {
+        perror("socket");
+        return EXIT_FAILURE;
+    }
+    if (mode == ipv6only) {
+        int value = 1;
+        if (-1 == setsockopt(srv_sock, IPPROTO_IPV6,
+                             IPV6_V6ONLY, &value, sizeof(value))) {
+            perror("setsockopt");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (-1 == bind(srv_sock, (struct sockaddr *) &addr, sizeof(addr))) {
+        perror("bind");
+        return EXIT_FAILURE;
+    }
+    if (-1 == listen(srv_sock, 10)) {
+        perror("listen");
+        return EXIT_FAILURE;
+    }
+
     puts("Server started, listening on port: 2020");
     main_loop(srv_sock);
 
@@ -45,7 +100,7 @@ int main(void) {
     return 0;
 }
 
-int listening_socket_tcp_ipv4(in_port_t port) {
+int listening_socket_tcp(in_port_t port, struct sockaddr_storage *ssp) {
     int fd;
 
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -83,7 +138,7 @@ int validate_calculate(char *buff, size_t bytes) {
     int64_t current = 0;
     int64_t part_of_result = 0;
 
-    if(!(buff[bytes - 2] == '\r' && buff[bytes - 1] == '\n')) {
+    if (!(buff[bytes - 2] == '\r' && buff[bytes - 1] == '\n')) {
         puts("invalid data, \\r\\n sequence missing");
         return -1;
     }
@@ -274,5 +329,52 @@ void thread_loop(int srv_sock) {
     rc = pthread_attr_destroy(&attr);
     if (rc != 0) {
         printf("pthread_attr_destroy error rc=%d\n", rc);
+    }
+}
+
+void print_sockaddr(const char *msg, struct sockaddr_storage *ssp) {
+    if (ssp->ss_family == AF_INET) {
+
+        struct sockaddr_in *p = (struct sockaddr_in *) ssp;
+        char buf[INET_ADDRSTRLEN];
+        if (NULL == inet_ntop(AF_INET, &(p->sin_addr), buf, sizeof(buf))) {
+            perror("inet_ntop");
+            exit(EXIT_FAILURE);
+        }
+        fprintf(stderr, "%s AF_INET addr %s port %i\n",
+                msg, buf, ntohs(p->sin_port));
+
+    } else if (ssp->ss_family == AF_INET6) {
+
+        struct sockaddr_in6 *q = (struct sockaddr_in6 *) ssp;
+        char buf[INET6_ADDRSTRLEN];
+        if (NULL == inet_ntop(AF_INET6, &(q->sin6_addr), buf, sizeof(buf))) {
+            perror("inet_ntop");
+            exit(EXIT_FAILURE);
+        }
+        fprintf(stderr, "%s AF_INET6 addr %s port %i\n",
+                msg, buf, ntohs(q->sin6_port));
+
+    } else {
+
+        fprintf(stderr, "print_sockaddr: unknown family\n");
+        exit(EXIT_FAILURE);
+
+    }
+}
+
+void make_sockaddr_for_binding(const int port, struct sockaddr_storage *ssp) {
+
+    memset(ssp, 0, sizeof(*ssp));
+    if (mode == ipv4) {
+        struct sockaddr_in *p = (struct sockaddr_in *) ssp;
+        p->sin_family = AF_INET;
+        p->sin_addr.s_addr = htonl(INADDR_ANY);
+        p->sin_port = htons(port);
+    } else {   // mode == ipv6 lub ipv6only
+        struct sockaddr_in6 *q = (struct sockaddr_in6 *) ssp;
+        q->sin6_family = AF_INET6;
+        q->sin6_addr = in6addr_any;   // in6addr_any jest strukturą
+        q->sin6_port = htons(port);
     }
 }
